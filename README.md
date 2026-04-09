@@ -1,0 +1,1 @@
+# competitve_intelligence_platform
