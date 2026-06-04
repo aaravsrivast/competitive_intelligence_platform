@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
@@ -48,12 +49,32 @@ async def lifespan(app: FastAPI):
         motor_client = None
 
 
-def _cors_origins() -> list[str]:
+# Matches Vite dev server URLs: localhost, 127.0.0.1, LAN IP (Network), IPv6 loopback.
+_LOCAL_DEV_ORIGIN_REGEX = (
+    r"https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|\[::1\])(:\d+)?"
+)
+
+
+def _cors_middleware_kwargs() -> dict[str, Any]:
     settings = get_settings()
     raw = settings.CORS_ORIGINS.strip()
+    strict = os.getenv("CORS_STRICT", "").lower() in ("1", "true", "yes")
+
+    kwargs: dict[str, Any] = {
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+    }
+
     if raw == "*":
-        return ["*"]
-    return [o.strip() for o in raw.split(",") if o.strip()]
+        kwargs["allow_origins"] = []
+    else:
+        kwargs["allow_origins"] = [o.strip() for o in raw.split(",") if o.strip()]
+
+    if not strict:
+        kwargs["allow_origin_regex"] = _LOCAL_DEV_ORIGIN_REGEX
+
+    return kwargs
 
 
 app = FastAPI(
@@ -62,13 +83,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_cors_origins(),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, **_cors_middleware_kwargs())
 
 _uploads = Path("uploads")
 _uploads.mkdir(exist_ok=True)

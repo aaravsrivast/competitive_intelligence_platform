@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, Building2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Building2, Loader2 } from "lucide-react";
 import type { Competitor } from "@/types/domain";
-import { listCompetitors } from "@/api/competitors";
+import { getCompetitorFinancials, listCompetitors } from "@/api/competitors";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Markdown } from "@/components/ui/markdown";
@@ -24,7 +24,22 @@ export function CompetitorsGrid() {
 
 function CompanyCard({ company }: { company: Competitor }) {
   const [open, setOpen] = useState(false);
-  const initials = company.name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+  const financialsQuery = useQuery({
+    queryKey: ["competitor-financials", company.name],
+    queryFn: () => getCompetitorFinancials(company.name),
+    enabled: open,
+    staleTime: 5 * 60_000,
+  });
+
+  const initials = company.name
+    .split(" ")
+    .map((s) => s[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  const summary = financialsQuery.data ?? company.financialsSummary;
+
   return (
     <Card className="flex flex-col rounded-xl border-border bg-card p-5 shadow-elegant transition-shadow hover:shadow-card-hover">
       <div className="flex items-center gap-3">
@@ -35,18 +50,34 @@ function CompanyCard({ company }: { company: Competitor }) {
           <h3 className="text-base font-semibold tracking-tight text-card-foreground">{company.name}</h3>
           <p className="text-xs text-muted-foreground">
             <Building2 className="mr-1 inline h-3 w-3" />
-            Pharmaceutical · Public
+            Pharmaceutical
           </p>
         </div>
       </div>
       <div className={cn("mt-4 transition-all", open ? "max-h-[1000px]" : "max-h-24 overflow-hidden")}>
-        <Markdown>{company.financialsSummary}</Markdown>
+        {financialsQuery.isLoading && open ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading financial summary…
+          </div>
+        ) : (
+          <Markdown>{summary}</Markdown>
+        )}
       </div>
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
         className="mt-3 inline-flex items-center gap-1 self-start text-xs font-medium text-primary hover:underline"
       >
-        {open ? <>Show less <ChevronUp className="h-3 w-3" /></> : <>Show more <ChevronDown className="h-3 w-3" /></>}
+        {open ? (
+          <>
+            Show less <ChevronUp className="h-3 w-3" />
+          </>
+        ) : (
+          <>
+            Show more <ChevronDown className="h-3 w-3" />
+          </>
+        )}
       </button>
     </Card>
   );

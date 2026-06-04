@@ -1,32 +1,46 @@
 import type { Note } from "@/types/domain";
-import { mockDelay } from "./client";
+import { apiFetch, apiFetchPaginated } from "./client";
+import { mapNote } from "./mappers";
 
-const store = new Map<string, Note[]>(); // key: `${userId}:${indicationId}`
+const CONTEXT_TYPE = "indication";
 
-const k = (userId: string, indicationId: string) => `${userId}:${indicationId}`;
-
-export async function listNotes(userId: string, indicationId: string): Promise<Note[]> {
-  return mockDelay(store.get(k(userId, indicationId)) ?? []);
+export async function listNotes(_userId: string, indicationId: string): Promise<Note[]> {
+  const docs = await apiFetchPaginated<Record<string, unknown>>("/notes", {
+    context_type: CONTEXT_TYPE,
+    context_id: indicationId,
+    limit: 200,
+  });
+  return docs.map(mapNote);
 }
 
-export async function upsertNote(input: { id?: string; userId: string; indicationId: string; content: string }): Promise<Note> {
-  const key = k(input.userId, input.indicationId);
-  const list = store.get(key) ?? [];
-  const now = new Date().toISOString();
+export async function upsertNote(input: {
+  id?: string;
+  userId: string;
+  indicationId: string;
+  content: string;
+}): Promise<Note> {
   if (input.id) {
-    const updated = list.map((n) => (n.id === input.id ? { ...n, content: input.content, updatedAt: now } : n));
-    store.set(key, updated);
-    const found = updated.find((n) => n.id === input.id);
-    if (!found) throw new Error("Note not found");
-    return mockDelay(found, 100);
+    const doc = await apiFetch<Record<string, unknown>>(`/notes/${input.id}`, {
+      method: "PATCH",
+      body: { body: input.content },
+    });
+    return mapNote(doc);
   }
-  const created: Note = { id: `note-${Date.now()}`, userId: input.userId, indicationId: input.indicationId, content: input.content, updatedAt: now };
-  store.set(key, [created, ...list]);
-  return mockDelay(created, 100);
+  const doc = await apiFetch<Record<string, unknown>>("/notes", {
+    method: "POST",
+    body: {
+      body: input.content,
+      context_type: CONTEXT_TYPE,
+      context_id: input.indicationId,
+    },
+  });
+  return mapNote(doc);
 }
 
-export async function deleteNote(userId: string, indicationId: string, noteId: string): Promise<void> {
-  const key = k(userId, indicationId);
-  store.set(key, (store.get(key) ?? []).filter((n) => n.id !== noteId));
-  return mockDelay(undefined, 80);
+export async function deleteNote(
+  _userId: string,
+  _indicationId: string,
+  noteId: string,
+): Promise<void> {
+  await apiFetch(`/notes/${noteId}`, { method: "DELETE" });
 }

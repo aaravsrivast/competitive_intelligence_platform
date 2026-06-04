@@ -1,0 +1,8 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/ci_backend/.venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  "python.terminal.activateEnvInCurrentTerminal": true,
+  "python.envFile": "${workspaceFolder}/ci_backend/.env",
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "python.analysis.extraPaths": ["${workspaceFolder}/ci_backend"]
+}

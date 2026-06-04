@@ -1,7 +1,8 @@
 import type { LogEntry } from "@/types/domain";
-import { MOCK_LOGS } from "@/lib/mockData";
-import { mockDelay } from "./client";
+import { apiFetchPaginated } from "./client";
+import { mapLogEntry } from "./mappers";
 
 export async function listLogs(): Promise<LogEntry[]> {
-  return mockDelay(MOCK_LOGS);
+  const docs = await apiFetchPaginated<Record<string, unknown>>("/logs", { limit: 500 });
+  return docs.map((d) => mapLogEntry(d));
 }

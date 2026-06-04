@@ -1,7 +1,12 @@
 import type { ProductProfile } from "@/types/domain";
-import { MOCK_PRODUCT_PROFILES } from "@/lib/mockData";
-import { mockDelay } from "./client";
+import { apiFetch } from "./client";
+import { mapProductProfile } from "./mappers";
 
 export async function getProductProfile(cardId: string): Promise<ProductProfile | undefined> {
-  return mockDelay(MOCK_PRODUCT_PROFILES.find((p) => p.cardId === cardId));
+  try {
+    const doc = await apiFetch<Record<string, unknown>>(`/product-profiles/${cardId}`);
+    return mapProductProfile(doc);
+  } catch {
+    return undefined;
+  }
 }

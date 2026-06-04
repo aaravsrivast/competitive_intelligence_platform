@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Users, Layers, ScrollText, Plus, Trash2, Search } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useAuth } from "@/hooks/useAuth";
-import { listUsers, upsertUser, deleteUser } from "@/api/admin";
+import { listUsers, upsertUser, deleteUser, type UpsertUserInput } from "@/api/admin";
 import { listLogs } from "@/api/logs";
 import { listTherapeuticAreas } from "@/api/therapeuticAreas";
 import type { ManagedUser } from "@/types/domain";
@@ -225,11 +225,12 @@ interface UserDialogProps {
   tenantId: string;
   tas: { id: string; name: string }[];
   onClose: () => void;
-  onSave: (u: ManagedUser) => void;
+  onSave: (u: UpsertUserInput) => void;
   saving: boolean;
 }
 
 function UserDialog({ user, tenantId, tas, onClose, onSave, saving }: UserDialogProps) {
+  const isNew = !user;
   const [form, setForm] = useState<ManagedUser>(
     user ?? {
       id: `u-${Date.now()}`,
@@ -241,6 +242,7 @@ function UserDialog({ user, tenantId, tas, onClose, onSave, saving }: UserDialog
       therapeuticAreaIds: [],
     },
   );
+  const [password, setPassword] = useState("");
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -258,6 +260,17 @@ function UserDialog({ user, tenantId, tas, onClose, onSave, saving }: UserDialog
             <Label className="text-xs">Email</Label>
             <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </div>
+          {isNew && (
+            <div>
+              <Label className="text-xs">Password (min 8 characters)</Label>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+          )}
           <div>
             <Label className="text-xs">Role</Label>
             <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as "user" | "admin" })}>
@@ -304,7 +317,10 @@ function UserDialog({ user, tenantId, tas, onClose, onSave, saving }: UserDialog
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button disabled={saving || !form.name || !form.email} onClick={() => onSave(form)}>
+          <Button
+            disabled={saving || !form.name || !form.email || (isNew && password.length < 8)}
+            onClick={() => onSave({ ...form, ...(isNew ? { password } : {}) })}
+          >
             {saving ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>

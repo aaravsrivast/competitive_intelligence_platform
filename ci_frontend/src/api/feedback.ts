@@ -1,10 +1,19 @@
 import type { Feedback } from "@/types/domain";
-import { mockDelay } from "./client";
+import { apiFetch } from "./client";
+import { mapFeedback } from "./mappers";
 
-const all: Feedback[] = [];
-
-export async function submitFeedback(input: { userId: string; rating: number; message: string }): Promise<Feedback> {
-  const created: Feedback = { id: `fb-${Date.now()}`, ...input, createdAt: new Date().toISOString() };
-  all.push(created);
-  return mockDelay(created, 200);
+export async function submitFeedback(input: {
+  userId: string;
+  rating: number;
+  message: string;
+}): Promise<Feedback> {
+  const doc = await apiFetch<Record<string, unknown>>("/feedbacks", {
+    method: "POST",
+    body: {
+      message: input.message,
+      rating: input.rating,
+      context_type: "general",
+    },
+  });
+  return mapFeedback({ ...doc, user_id: input.userId });
 }

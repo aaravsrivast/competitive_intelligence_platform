@@ -26,8 +26,8 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [email, setEmail] = useState("admin@demo.io");
-  const [password, setPassword] = useState("demo");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const doLogin = async (em: string, pw: string) => {
@@ -47,12 +47,6 @@ function LoginPage() {
     e.preventDefault();
     void doLogin(email, password);
   };
-
-  const demoAccounts = [
-    { email: "super@demo.io", label: "superadmin" },
-    { email: "admin@demo.io", label: "tenant admin" },
-    { email: "user@demo.io", label: "standard user" },
-  ];
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary-muted/40 px-4">
@@ -109,29 +103,12 @@ function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 rounded-lg border border-dashed border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">Demo accounts — click to sign in</p>
-            <ul className="mt-2 space-y-1">
-              {demoAccounts.map((acc) => (
-                <li key={acc.email}>
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => {
-                      setEmail(acc.email);
-                      setPassword("demo");
-                      void doLogin(acc.email, "demo");
-                    }}
-                    className="flex w-full items-center justify-between rounded-md border border-transparent bg-background/60 px-2 py-1.5 text-left font-mono text-[11px] transition-colors hover:border-border hover:bg-background disabled:opacity-50"
-                  >
-                    <span className="text-foreground">{acc.email}</span>
-                    <span className="text-muted-foreground">{acc.label}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 font-sans">Any non-empty password works.</p>
-          </div>
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            Use credentials provisioned in your tenant. API:{" "}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
+              {import.meta.env.VITE_API_BASE_URL || "VITE_API_BASE_URL not set"}
+            </code>
+          </p>
         </div>
       </div>
     </div>

@@ -1,11 +1,16 @@
 import type { ClinicalTrial } from "@/types/domain";
-import { MOCK_TRIALS } from "@/lib/mockData";
-import { mockDelay } from "./client";
+import { apiFetch, apiFetchPaginated } from "./client";
+import { mapClinicalTrial } from "./mappers";
 
 export async function listTrials(indicationId: string): Promise<ClinicalTrial[]> {
-  return mockDelay(MOCK_TRIALS.filter((t) => t.indicationId === indicationId));
+  const docs = await apiFetchPaginated<Record<string, unknown>>("/clinical-trials", { limit: 200 });
+  return docs.map((d) => mapClinicalTrial(d, indicationId));
 }
 
 export async function syncTrial(nctId: string): Promise<ClinicalTrial | undefined> {
-  return mockDelay(MOCK_TRIALS.find((t) => t.nct_id === nctId), 600);
+  const doc = await apiFetch<Record<string, unknown>>(
+    `/clinical-trials/sync/${encodeURIComponent(nctId)}`,
+    { method: "POST" },
+  );
+  return mapClinicalTrial(doc);
 }

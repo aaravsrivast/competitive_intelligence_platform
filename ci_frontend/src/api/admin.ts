@@ -1,46 +1,103 @@
 import type { ManagedUser, Tenant } from "@/types/domain";
-import { MOCK_TENANTS, MOCK_USERS } from "@/lib/mockData";
-import { mockDelay } from "./client";
-
-let tenants: Tenant[] = [...MOCK_TENANTS];
-let users: ManagedUser[] = [...MOCK_USERS];
+import { apiFetch, apiFetchPaginated } from "./client";
+import { isNewEntityId, mapManagedUser, mapTenant, slugify, tenantToSettings } from "./mappers";
 
 export async function listTenants(): Promise<Tenant[]> {
-  return mockDelay(tenants);
+  const docs = await apiFetchPaginated<Record<string, unknown>>("/superadmin/tenants", { limit: 200 });
+  return docs.map(mapTenant);
 }
 
-export async function upsertTenant(input: Omit<Tenant, "createdAt" | "adminCount"> & { adminCount?: number }): Promise<Tenant> {
-  const existing = tenants.find((t) => t.id === input.id);
-  if (existing) {
-    const updated = { ...existing, ...input, adminCount: input.adminCount ?? existing.adminCount };
-    tenants = tenants.map((t) => (t.id === input.id ? updated : t));
-    return mockDelay(updated, 100);
+export async function upsertTenant(
+  input: Omit<Tenant, "createdAt" | "adminCount"> & { adminCount?: number },
+): Promise<Tenant> {
+  const settings = tenantToSettings(input as Tenant);
+  if (isNewEntityId(input.id)) {
+    const doc = await apiFetch<Record<string, unknown>>("/superadmin/tenants", {
+      method: "POST",
+      body: { name: input.name, slug: slugify(input.name), settings },
+    });
+    return mapTenant(doc);
   }
-  const created: Tenant = { ...input, adminCount: input.adminCount ?? 1, createdAt: new Date().toISOString() };
-  tenants = [created, ...tenants];
-  return mockDelay(created, 100);
+  const doc = await apiFetch<Record<string, unknown>>(`/superadmin/tenants/${input.id}`, {
+    method: "PATCH",
+    body: { name: input.name, settings },
+  });
+  return mapTenant(doc);
 }
 
 export async function deleteTenant(id: string): Promise<void> {
-  tenants = tenants.filter((t) => t.id !== id);
-  return mockDelay(undefined, 50);
+  await apiFetch(`/superadmin/tenants/${id}`, { method: "DELETE" });
 }
 
 export async function listUsers(tenantId: string): Promise<ManagedUser[]> {
-  return mockDelay(users.filter((u) => u.tenantId === tenantId));
+  const docs = await apiFetchPaginated<Record<string, unknown>>("/users", { limit: 200 });
+  return docs.map((d) => mapManagedUser(d, tenantId));
 }
 
-export async function upsertUser(u: ManagedUser): Promise<ManagedUser> {
-  const exists = users.find((x) => x.id === u.id);
-  if (exists) {
-    users = users.map((x) => (x.id === u.id ? u : x));
-  } else {
-    users = [u, ...users];
+export type UpsertUserInput = ManagedUser & { password?: string };
+
+export async function upsertUser(u: UpsertUserInput): Promise<ManagedUser> {
+  const [firstName, ...rest] = u.name.trim().split(/\s+/);
+  const lastName = rest.join(" ") || undefined;
+
+  if (isNewEntityId(u.id)) {
+    if (!u.password || u.password.length < 8) {
+      throw new Error("Password must be at least 8 characters for new users");
+    }
+    const doc = await apiFetch<Record<string, unknown>>("/users", {
+      method: "POST",
+      body: {
+        email: u.email,
+        password: u.password,
+        role: u.role,
+        first_name: firstName,
+        last_name: lastName,
+        therapeutic_area_ids: u.therapeuticAreaIds,
+      },
+    });
+    return mapManagedUser(doc, u.tenantId);
   }
-  return mockDelay(u, 100);
+
+  await apiFetch(`/users/${u.id}`, {
+    method: "PATCH",
+    body: {
+      first_name: firstName,
+      last_name: lastName,
+      active: u.active,
+    },
+  });
+
+  await apiFetch(`/users/${u.id}/therapeutic-areas`, {
+    method: "POST",
+    body: { therapeutic_area_ids: u.therapeuticAreaIds },
+  });
+
+  const before = (await apiFetchPaginated<Record<string, unknown>>("/users", { limit: 200 })).find(
+    (x) => String(x.id) === u.id,
+  );
+  if (before && before.role !== u.role) {
+    await apiFetch(`/users/${u.id}/role`, {
+      method: "POST",
+      body: { role: u.role },
+    });
+  }
+
+  const doc = (await apiFetchPaginated<Record<string, unknown>>("/users", { limit: 200 })).find(
+    (x) => String(x.id) === u.id,
+  ) ?? {
+    id: u.id,
+    email: u.email,
+    role: u.role,
+    tenant_id: u.tenantId,
+    first_name: firstName,
+    last_name: lastName,
+    therapeutic_area_ids: u.therapeuticAreaIds,
+    active: u.active,
+  };
+
+  return mapManagedUser(doc, u.tenantId);
 }
 
 export async function deleteUser(id: string): Promise<void> {
-  users = users.filter((u) => u.id !== id);
-  return mockDelay(undefined, 50);
+  await apiFetch(`/users/${id}`, { method: "DELETE" });
 }
