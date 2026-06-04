@@ -1,0 +1,36 @@
+import { createRouter } from "@tanstack/react-router";
+import { QueryClient } from "@tanstack/react-query";
+import { routeTree } from "./routeTree.gen";
+
+export interface RouterContext {
+  queryClient: QueryClient;
+}
+
+export const getRouter = () => {
+  // Fresh QueryClient per request — prevents data leaking across SSR requests.
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 30_000,
+        refetchOnWindowFocus: false,
+        retry: 1,
+      },
+    },
+  });
+
+  const router = createRouter({
+    routeTree,
+    context: { queryClient },
+    scrollRestoration: true,
+    defaultPreload: "intent",
+    defaultPreloadStaleTime: 0,
+  });
+
+  return router;
+};
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: ReturnType<typeof getRouter>;
+  }
+}
